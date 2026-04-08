@@ -1,11 +1,11 @@
 // =============================================================
-//  CompararVariables.C
+//  CompararVariables_380.C
 //
 //  Compara las variables del output del FSRGammaGamma (TreeS)
 //  con las del output de ExtractVariables_Etapa2 (Variables)
 //
 //  COMO CORRERLO (desde ~/delphes):
-//      root -l ~/Documentos/Facu/Tesis/CompararVariables.C
+//      root -l ~/Documentos/Facu/Tesis/CompararVariables_380.C
 //
 //  NO se comparan: AntiKt (invMassB1AntiKt, invMassB2AntiKt, nJetsAntiKt)
 //                  KinFit (invMassB1FitBest, invMassB2FitBest, chi2ndfBest, jetPairMassDeltaFit)
@@ -79,10 +79,10 @@ void dibujar(TTree *tFSR, TTree *tMio,
     leg->Draw();
 }
 
-void CompararVariables() {
+void CompararVariables_380() {
 
     const char *archivoFSR = "/home/abri/Documentos/Facu/Tesis/outputTreeSHHbbbbESpreadDurham1034BSplitSampleN.root";
-    const char *archivoMio = "/home/abri/Documentos/Facu/Tesis/variables_etapa2.root";
+    const char *archivoMio = "/home/abri/Documentos/Facu/Tesis/variables_HHbbbb_380GeV.root";
 
     TFile *fFSR = TFile::Open(archivoFSR);
     if (!fFSR || fFSR->IsZombie()) { cout << "ERROR abriendo FSR" << endl; return; }
