@@ -15,6 +15,7 @@
 
 #ifdef __CLING__
 R__LOAD_LIBRARY(/home/abri/delphes/libDelphes.so)
+
 #include "classes/DelphesClasses.h"
 #include "external/ExRootAnalysis/ExRootTreeReader.h"
 #include "TLorentzVector.h"
@@ -29,12 +30,15 @@ R__LOAD_LIBRARY(/home/abri/delphes/libDelphes.so)
 #include <iostream>
 #include <vector>
 #include <limits>
+#include <algorithm>
+#include <tuple>
 #endif
 
 using namespace std;
 
 // ---------------------------------------------------------------
 // cos(theta) exacto a partir de eta: cos(theta) = cos(2*atan(e^{-eta}))
+//Eta Sale de los Jets
 // ---------------------------------------------------------------
 float calcCosTheta(float eta) {
     float eEta = pow(TMath::E(), -eta);
@@ -45,6 +49,7 @@ float calcCosTheta(float eta) {
 // ---------------------------------------------------------------
 // Forma del evento: sphericity o aplanarity
 // Usa el tensor de momentos normalizado con los 4 jets
+// Si no se entiende Santiago hizo lo mismo con el mismo nombre
 // ---------------------------------------------------------------
 float findEventShape(TLorentzVector j1, TLorentzVector j2,
                      TLorentzVector j3, TLorentzVector j4, string shape) {
@@ -73,6 +78,7 @@ float findEventShape(TLorentzVector j1, TLorentzVector j2,
 // ---------------------------------------------------------------
 // Thrust: maximiza sum|p.n| / sum|p| sobre todos los vectores unitarios n
 // Se hace por barrido angular (igual que en el original)
+// No termino de entender bien que hace esta variable
 // ---------------------------------------------------------------
 float findThrust(vector<TLorentzVector>& momenta, TLorentzVector& thrustAxis) {
     float maxThrust = 0.0;
@@ -99,6 +105,7 @@ float findThrust(vector<TLorentzVector>& momenta, TLorentzVector& thrustAxis) {
 // ---------------------------------------------------------------
 // Pairing de jets que minimiza chi2 respecto a masa del H (125 GeV)
 // Devuelve los dos TLorentzVector de los pares optimos
+// Lo hace Distinto a Santiago. Este codigo devuelve solo los Jets que minimizan el chi2 no devuelven el chi2.
 // ---------------------------------------------------------------
 void findJetPairsHH(TLorentzVector j1, TLorentzVector j2,
                     TLorentzVector j3, TLorentzVector j4,
@@ -138,6 +145,7 @@ void findJetPairsZZ(TLorentzVector j1, TLorentzVector j2,
 
 // ---------------------------------------------------------------
 // Masa minima entre todos los pares posibles de jets
+// Yo solo calculo M no guardo los tensores
 // ---------------------------------------------------------------
 float findMinJetM(TLorentzVector j1, TLorentzVector j2,
                   TLorentzVector j3, TLorentzVector j4) {
@@ -147,6 +155,57 @@ float findMinJetM(TLorentzVector j1, TLorentzVector j2,
     m = TMath::Min(m, (float)(j1+j4).M());
     m = TMath::Min(m, (float)(j2+j3).M());
     return m;
+}
+
+// ---------------------------------------------------------------
+// Calcula el chi2 de un par de grupos de jets respecto a mH=125
+// Igual que en el codigo de Santiago (calculateChiSquared)
+// ---------------------------------------------------------------
+double calculateChiSquared(TLorentzVector j1, TLorentzVector j2,
+                           TLorentzVector j3, TLorentzVector j4,
+                           const vector<int>& group1, const vector<int>& group2) {
+    vector<TLorentzVector> jets = {j1, j2, j3, j4};
+    TLorentzVector pair1, pair2;
+    for (int idx : group1) pair1 += jets[idx];
+    for (int idx : group2) pair2 += jets[idx];
+    return pow(pair1.M()-125, 2) + pow(pair2.M()-125, 2);
+}
+
+// ---------------------------------------------------------------
+// Encuentra todas las combinaciones de pares de jets, las ordena
+// por chi2 creciente y devuelve las 8 mejores.
+// Igual que en el codigo de Santiago (findBestCombination + sortVectorTriple)
+// ---------------------------------------------------------------
+void findBestCombinations(TLorentzVector j1, TLorentzVector j2,
+                          TLorentzVector j3, TLorentzVector j4,
+                          vector<double>& chiSquares,
+                          vector<vector<int>>& group1s,
+                          vector<vector<int>>& group2s) {
+    int n = 4;
+    for (int i = 1; i < (1 << n) - 1; ++i) {
+        vector<int> g1, g2;
+        g1.push_back(0);
+        for (int j = 1; j < n; ++j) {
+            if (i & (1 << (j-1))) g1.push_back(j);
+            else g2.push_back(j);
+        }
+        double chi = calculateChiSquared(j1, j2, j3, j4, g1, g2);
+        chiSquares.push_back(chi);
+        group1s.push_back(g1);
+        group2s.push_back(g2);
+    }
+    // Ordenar por chi2 creciente (igual que sortVectorTriple de Santiago)
+    vector<tuple<double, vector<int>, vector<int>>> combined;
+    for (size_t i = 0; i < chiSquares.size(); i++)
+        combined.push_back(make_tuple(chiSquares[i], group1s[i], group2s[i]));
+    sort(combined.begin(), combined.end(),
+         [](const tuple<double,vector<int>,vector<int>>& a,
+            const tuple<double,vector<int>,vector<int>>& b){ return get<0>(a) < get<0>(b); });
+    for (size_t i = 0; i < combined.size(); i++) {
+        chiSquares[i] = get<0>(combined[i]);
+        group1s[i]    = get<1>(combined[i]);
+        group2s[i]    = get<2>(combined[i]);
+    }
 }
 
 // ---------------------------------------------------------------
@@ -160,9 +219,9 @@ void ExtractVariables_Etapa2() {
     // ----------------------------------------------------------
     const char *inputFile  = "/home/abri/Documentos/Facu/Tesis/output_test.root";
     const char *outputFile = "/home/abri/Documentos/Facu/Tesis/variables_etapa2.root";
-
     // ----------------------------------------------------------
-    // Abrir el arbol de Delphes
+    //  Abrir el arbol de Delphes.
+    // Te crea una cadena donde pone tu archivo de salida. Ademas pone un lector de columnas y un contador de eventos.
     // ----------------------------------------------------------
     TChain chain("Delphes");
     chain.Add(inputFile);
@@ -172,7 +231,8 @@ void ExtractVariables_Etapa2() {
     cout << "Eventos en el archivo: " << numberOfEntries << endl;
 
     // ----------------------------------------------------------
-    // Branches de entrada
+    // Declarar los branches que vamos a Leer del archivo. 
+    // Osea los que vamos a usar para definir las nuevas variables.
     // ----------------------------------------------------------
     TClonesArray *branchJet            = treeReader->UseBranch("Jet");
     TClonesArray *branchMissingET      = treeReader->UseBranch("MissingET");
@@ -190,11 +250,18 @@ void ExtractVariables_Etapa2() {
 
     // ----------------------------------------------------------
     // === ETAPA 1: variables originales ===
+    // Esto solo esta porque yo lo hice en dos partes. 
     // ----------------------------------------------------------
     float cosThetaJet1, cosThetaJet2, cosThetaJet3, cosThetaJet4;
     float ptJet1, ptJet2, ptJet3, ptJet4, sumPt;
     float massJet1, massJet2, massJet3, massJet4;
     float missingET;
+
+    // ----------------------------------------------------------
+    // Conectar las variables al arbol de salida
+    // Sintaxis: Branch("nombre_en_root", &variable, "nombre/tipo")
+    // F = float (Esto es muy util :))
+    // ----------------------------------------------------------
 
     outTree->Branch("cosThetaJet1", &cosThetaJet1, "cosThetaJet1/F");
     outTree->Branch("cosThetaJet2", &cosThetaJet2, "cosThetaJet2/F");
@@ -259,30 +326,35 @@ void ExtractVariables_Etapa2() {
     float deltaRJetPairs;
     outTree->Branch("deltaRJetPairs",&deltaRJetPairs,"deltaRJetPairs/F");
 
-    // -- Constituyentes de jets --
-    float constSizeB1, constSizeB2, constSizeB3, constSizeB4, minConstSize;
-    float jetB1NCharged, jetB2NCharged, jetB3NCharged, jetB4NCharged;
-    float jetB1NNeutrals, jetB2NNeutrals, jetB3NNeutrals, jetB4NNeutrals;
-    float jetNObjects, minJetNObjects;
-    float nParticles;
-    outTree->Branch("constSizeB1",   &constSizeB1,   "constSizeB1/F");
-    outTree->Branch("constSizeB2",   &constSizeB2,   "constSizeB2/F");
-    outTree->Branch("constSizeB3",   &constSizeB3,   "constSizeB3/F");
-    outTree->Branch("constSizeB4",   &constSizeB4,   "constSizeB4/F");
-    outTree->Branch("minConstSize",  &minConstSize,  "minConstSize/F");
-    outTree->Branch("jetB1NCharged", &jetB1NCharged, "jetB1NCharged/F");
-    outTree->Branch("jetB2NCharged", &jetB2NCharged, "jetB2NCharged/F");
-    outTree->Branch("jetB3NCharged", &jetB3NCharged, "jetB3NCharged/F");
-    outTree->Branch("jetB4NCharged", &jetB4NCharged, "jetB4NCharged/F");
-    outTree->Branch("jetB1NNeutrals",&jetB1NNeutrals,"jetB1NNeutrals/F");
-    outTree->Branch("jetB2NNeutrals",&jetB2NNeutrals,"jetB2NNeutrals/F");
-    outTree->Branch("jetB3NNeutrals",&jetB3NNeutrals,"jetB3NNeutrals/F");
-    outTree->Branch("jetB4NNeutrals",&jetB4NNeutrals,"jetB4NNeutrals/F");
-    outTree->Branch("jetNObjects",   &jetNObjects,   "jetNObjects/F");
-    outTree->Branch("minJetNObjects",&minJetNObjects,"minJetNObjects/F");
-    outTree->Branch("nParticles",    &nParticles,    "nParticles/F");
+    // -- Best Combinations: las 8 mejores combinaciones de pares de jets
+    // ordenadas por chi2 minimo a mH=125 GeV (igual que Santiago) --
+    float invMassB11Best, invMassB21Best;
+    float invMassB12Best, invMassB22Best;
+    float invMassB13Best, invMassB23Best;
+    float invMassB14Best, invMassB24Best;
+    float invMassB15Best, invMassB25Best;
+    float invMassB16Best, invMassB26Best;
+    float invMassB17Best, invMassB27Best;
+    float invMassB18Best, invMassB28Best;
+    outTree->Branch("invMassB11Best",&invMassB11Best,"invMassB11Best/F");
+    outTree->Branch("invMassB21Best",&invMassB21Best,"invMassB21Best/F");
+    outTree->Branch("invMassB12Best",&invMassB12Best,"invMassB12Best/F");
+    outTree->Branch("invMassB22Best",&invMassB22Best,"invMassB22Best/F");
+    outTree->Branch("invMassB13Best",&invMassB13Best,"invMassB13Best/F");
+    outTree->Branch("invMassB23Best",&invMassB23Best,"invMassB23Best/F");
+    outTree->Branch("invMassB14Best",&invMassB14Best,"invMassB14Best/F");
+    outTree->Branch("invMassB24Best",&invMassB24Best,"invMassB24Best/F");
+    outTree->Branch("invMassB15Best",&invMassB15Best,"invMassB15Best/F");
+    outTree->Branch("invMassB25Best",&invMassB25Best,"invMassB25Best/F");
+    outTree->Branch("invMassB16Best",&invMassB16Best,"invMassB16Best/F");
+    outTree->Branch("invMassB26Best",&invMassB26Best,"invMassB26Best/F");
+    outTree->Branch("invMassB17Best",&invMassB17Best,"invMassB17Best/F");
+    outTree->Branch("invMassB27Best",&invMassB27Best,"invMassB27Best/F");
+    outTree->Branch("invMassB18Best",&invMassB18Best,"invMassB18Best/F");
+    outTree->Branch("invMassB28Best",&invMassB28Best,"invMassB28Best/F");
 
     // -- Variables de Durham jet clustering exclusivo --
+    // Segun entiendo con la card que corrimos de delphes no tenemos ANtiKt
     // Se leen del primer jet del branch (Delphes las guarda ahi)
     float exclYmerge12, exclYmerge23, exclYmerge34, exclYmerge45, exclYmerge56;
     outTree->Branch("exclYmerge12",&exclYmerge12,"exclYmerge12/F");
@@ -297,7 +369,7 @@ void ExtractVariables_Etapa2() {
     int contTotal = 0, contPasaron = 0, contVeto = 0;
 
     // ----------------------------------------------------------
-    // LOOP PRINCIPAL
+    // LOOP PRINCIPAL. Recorre cada evento uno por uno
     // ----------------------------------------------------------
     for (Long64_t entry = 0; entry < numberOfEntries; entry++) {
 
@@ -405,39 +477,43 @@ void ExtractVariables_Etapa2() {
         // ---- DeltaR entre los dos pares de jets ----
         deltaRJetPairs = (float) pairHH1.DeltaR(pairHH2);
 
-        // ---- Constituyentes de cada jet ----
-        TRefArray* c1 = &(jet1->Constituents);
-        TRefArray* c2 = &(jet2->Constituents);
-        TRefArray* c3 = &(jet3->Constituents);
-        TRefArray* c4 = &(jet4->Constituents);
-        constSizeB1 = (float) c1->GetSize();
-        constSizeB2 = (float) c2->GetSize();
-        constSizeB3 = (float) c3->GetSize();
-        constSizeB4 = (float) c4->GetSize();
-        minConstSize = TMath::Min(TMath::Min(constSizeB1, constSizeB2),
-                                 TMath::Min(constSizeB3, constSizeB4));
+        // ---- Best Combinations: 8 mejores pares ordenados por chi2 a mH=125 ----
+        // Igual que Santiago: findBestCombination + sortVectorTriple
+        vector<double> chiSquares;
+        vector<vector<int>> group1s, group2s;
+        findBestCombinations(j1, j2, j3, j4, chiSquares, group1s, group2s);
+        vector<TLorentzVector> jets = {j1, j2, j3, j4};
 
-        jetB1NCharged  = (float) jet1->NCharged;
-        jetB2NCharged  = (float) jet2->NCharged;
-        jetB3NCharged  = (float) jet3->NCharged;
-        jetB4NCharged  = (float) jet4->NCharged;
-        jetB1NNeutrals = (float) jet1->NNeutrals;
-        jetB2NNeutrals = (float) jet2->NNeutrals;
-        jetB3NNeutrals = (float) jet3->NNeutrals;
-        jetB4NNeutrals = (float) jet4->NNeutrals;
+        // Inicializar en -999 por si hay menos de 8 combinaciones unicas
+        invMassB11Best = invMassB21Best = -999;
+        invMassB12Best = invMassB22Best = -999;
+        invMassB13Best = invMassB23Best = -999;
+        invMassB14Best = invMassB24Best = -999;
+        invMassB15Best = invMassB25Best = -999;
+        invMassB16Best = invMassB26Best = -999;
+        invMassB17Best = invMassB27Best = -999;
+        invMassB18Best = invMassB28Best = -999;
 
-        float nObj1 = jetB1NCharged + jetB1NNeutrals;
-        float nObj2 = jetB2NCharged + jetB2NNeutrals;
-        float nObj3 = jetB3NCharged + jetB3NNeutrals;
-        float nObj4 = jetB4NCharged + jetB4NNeutrals;
-        jetNObjects    = nObj1 + nObj2 + nObj3 + nObj4;
-        minJetNObjects = TMath::Min(TMath::Min(nObj1, nObj2),
-                                   TMath::Min(nObj3, nObj4));
-
-        // nParticles: numero de objetos EFlow totales del evento
-        nParticles = (float)(branchEFlowTrack->GetEntries()
-                           + branchEFlowPhoton->GetEntries()
-                           + branchEFlowNeutHad->GetEntries());
+        // Guardar combinaciones unicas (mismo chi2 = misma combinacion)
+        int nUnique = 0;
+        double lastChi = -1;
+        for (size_t i = 0; i < chiSquares.size() && nUnique < 8; i++) {
+            if (chiSquares[i] == lastChi) continue;
+            lastChi = chiSquares[i];
+            TLorentzVector p1, p2;
+            for (int idx : group1s[i]) p1 += jets[idx];
+            for (int idx : group2s[i]) p2 += jets[idx];
+            float m1 = (float) p1.M(), m2 = (float) p2.M();
+            if      (nUnique == 0) { invMassB11Best = m1; invMassB21Best = m2; }
+            else if (nUnique == 1) { invMassB12Best = m1; invMassB22Best = m2; }
+            else if (nUnique == 2) { invMassB13Best = m1; invMassB23Best = m2; }
+            else if (nUnique == 3) { invMassB14Best = m1; invMassB24Best = m2; }
+            else if (nUnique == 4) { invMassB15Best = m1; invMassB25Best = m2; }
+            else if (nUnique == 5) { invMassB16Best = m1; invMassB26Best = m2; }
+            else if (nUnique == 6) { invMassB17Best = m1; invMassB27Best = m2; }
+            else if (nUnique == 7) { invMassB18Best = m1; invMassB28Best = m2; }
+            nUnique++;
+        }
 
         // ---- Variables de Durham jet clustering exclusivo ----
         // Delphes guarda los ExclYmergeXX en el primer jet del branch
