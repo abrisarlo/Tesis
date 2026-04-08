@@ -1,9 +1,0 @@
-node_modules/
-.venv/
-env/
-__pycache__/
-*.pyc
-*.csv
-*.log
-*.tar.gz
-GammaGammaHHESpreadAllSiD2024XCC.root
