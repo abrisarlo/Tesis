@@ -37,7 +37,7 @@ Usa el output de Delphes de Santiago y extrae las variables. Es el archivo que t
 
 Yo compare esta salida con la de 380 GeV de Santiago y me dio los graficos que estan en la carpeta `Graficos Comparacion/380`.
 
-####**Umar** 
+#### **Umar** 
 En la carpeta de Umar esta su codigo **`preselection_4j3b.py`** que extrae las variables a un output que no pude subir porque es muy grande. Esta en la misma carpeta el archivo **`comparar_outputs.py`** con el cual hice los graficos de comparación con Umar.
 
 ---
@@ -59,6 +59,7 @@ Compara las variables a 280 GeV nuestras con las de 380 GeV de Santiago.
 Compara las variables a 380 GeV "nuestras" con las de 380 GeV de Santiago. Esta solo compara la extraccion de variables.
 
 **`Graficos`** 
+
 En esta carpeta se pueden ver todos los archivos y codigos de comparacion entre los tres códigos.
 
 ---
