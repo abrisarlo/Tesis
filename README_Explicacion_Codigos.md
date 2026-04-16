@@ -18,9 +18,6 @@ Explico lo de la card porque este archivo tiene algo que nuestra salida de Delph
 
 ### 280 GeV
 
-**`ExtractVariables_Etapa1.C`** → **`variables_etapa1.root`**
-
-Primeras pruebas en las que solo extraigo informacion de los archivos de entrada.
 
 **`ExtractVariables_Etapa2.C`** → **`variables_etapa2.root`**
 
@@ -40,6 +37,9 @@ Usa el output de Delphes de Santiago y extrae las variables. Es el archivo que t
 
 Yo compare esta salida con la de 380 GeV de Santiago y me dio los graficos que estan en la carpeta `Graficos Comparacion/380`.
 
+####**Umar** 
+En la carpeta de Umar esta su codigo **`preselection_4j3b.py`** que extrae las variables a un output que no pude subir porque es muy grande. Esta en la misma carpeta el archivo **`comparar_outputs.py`** con el cual hice los graficos de comparación con Umar.
+
 ---
 
 ## Comparacion
@@ -57,6 +57,9 @@ Compara las variables a 280 GeV nuestras con las de 380 GeV de Santiago.
 **`CompararVariables_380.C`**
 
 Compara las variables a 380 GeV "nuestras" con las de 380 GeV de Santiago. Esta solo compara la extraccion de variables.
+
+**`Graficos`** 
+En esta carpeta se pueden ver todos los archivos y codigos de comparacion entre los tres códigos.
 
 ---
 
